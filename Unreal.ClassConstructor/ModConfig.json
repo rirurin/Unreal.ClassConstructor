@@ -1,0 +1,23 @@
+{
+  "ModId": "Unreal.ClassConstructor",
+  "ModName": "Unreal Engine Class Constructor",
+  "ModAuthor": "Rirurin",
+  "ModVersion": "1.0.0",
+  "ModDescription": "Utilities for modifying and creating classes/objects",
+  "ModDll": "Unreal.ClassConstructor.dll",
+  "ModIcon": "Preview.png",
+  "ModR2RManagedDll32": "x86/Unreal.ClassConstructor.dll",
+  "ModR2RManagedDll64": "x64/Unreal.ClassConstructor.dll",
+  "ModNativeDll32": "",
+  "ModNativeDll64": "",
+  "IsLibrary": false,
+  "ReleaseMetadataFileName": "Unreal.ClassConstructor.ReleaseMetadata.json",
+  "PluginData": {},
+  "IsUniversalMod": false,
+  "ModDependencies": [ "reloaded.sharedlib.hooks" ],
+  "OptionalDependencies": [],
+  "SupportedAppId": [
+    "p3r.exe"
+  ],
+  "ProjectUrl": ""
+}
