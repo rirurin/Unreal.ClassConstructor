@@ -1,5 +1,7 @@
 ﻿using Reloaded.Hooks.ReloadedII.Interfaces;
 using Reloaded.Mod.Interfaces;
+using SharedScans.Interfaces;
+using System.Diagnostics;
 using Unreal.ClassConstructor.Configuration;
 using Unreal.ClassConstructor.Template;
 
@@ -41,6 +43,10 @@ namespace Unreal.ClassConstructor
         /// </summary>
         private readonly IModConfig _modConfig;
 
+        private ObjectImports _imports;
+        private long _baseAddress;
+        private HookState _hookState;
+
         public Mod(ModContext context)
         {
             _modLoader = context.ModLoader;
@@ -50,14 +56,14 @@ namespace Unreal.ClassConstructor
             _configuration = context.Configuration;
             _modConfig = context.ModConfig;
 
-
-            // For more information about this template, please see
-            // https://reloaded-project.github.io/Reloaded-II/ModTemplate/
-
-            // If you want to implement e.g. unload support in your mod,
-            // and some other neat features, override the methods in ModBase.
-
-            // TODO: Implement some mod logic
+            var mainModule = Process.GetCurrentProcess().MainModule;
+            if (mainModule == null) throw new Exception($"[{_modConfig.ModName}] Could not get main module");
+            _baseAddress = mainModule.BaseAddress;
+            _modLoader.GetController<ISharedScans>().TryGetTarget(out var sharedScans);
+            if (_hooks == null) throw new Exception($"[{_modConfig.ModName}] Could not get controller for Reloaded hooks");
+            if (sharedScans == null) throw new Exception($"[{_modConfig.ModName}] Could not get controller for Shared Scans");
+            _hookState = new(sharedScans, _baseAddress, _hooks);
+            _imports = new(_hookState);
         }
 
         #region Standard Overrides

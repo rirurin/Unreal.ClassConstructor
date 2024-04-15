@@ -1,6 +1,6 @@
 {
   "ModId": "Unreal.ClassConstructor",
-  "ModName": "Unreal Engine Class Constructor",
+  "ModName": "Unreal Class Constructor",
   "ModAuthor": "Rirurin",
   "ModVersion": "1.0.0",
   "ModDescription": "Utilities for modifying and creating classes/objects",
@@ -14,7 +14,11 @@
   "ReleaseMetadataFileName": "Unreal.ClassConstructor.ReleaseMetadata.json",
   "PluginData": {},
   "IsUniversalMod": false,
-  "ModDependencies": [ "reloaded.sharedlib.hooks" ],
+  "ModDependencies": [
+    "p3rpc.nativetypes",
+    "reloaded.sharedlib.hooks",
+    "SharedScans.Reloaded"
+  ],
   "OptionalDependencies": [],
   "SupportedAppId": [
     "p3r.exe"
