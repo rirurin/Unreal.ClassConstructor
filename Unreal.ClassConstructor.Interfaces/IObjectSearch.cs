@@ -1,5 +1,4 @@
-﻿using p3rpc.nativetypes.Interfaces;
-
+﻿using Unreal.NativeTypes.Interfaces;
 namespace Unreal.ClassConstructor.Interfaces
 {
     public interface IObjectSearch
@@ -13,5 +12,7 @@ namespace Unreal.ClassConstructor.Interfaces
         public unsafe void FindFirstOfAsync(string objType, Action<nint> foundCb);
         public unsafe void FindAllOfAsync(string objType, Action<ICollection<nint>> foundCb);
         public unsafe UObject* GetEngineTransient();
+        public unsafe UClass* GetType(string type);
+        public unsafe void GetTypeAsync(string type, Action<nint> foundCb);
     }
 }

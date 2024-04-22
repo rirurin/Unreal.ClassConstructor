@@ -1,4 +1,5 @@
-﻿using p3rpc.nativetypes.Interfaces;
+﻿using p3rpc.commonmodutils;
+using Unreal.NativeTypes.Interfaces;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -9,18 +10,20 @@ using Unreal.ClassConstructor.Interfaces;
 
 namespace Unreal.ClassConstructor
 {
-    public class ObjectSearch : IObjectSearch
+    public class ObjectSearch : ModuleBase<ClassConstructorContext>, IObjectSearch
     {
         private Thread _findObjectThread { get; init; }
         private BlockingCollection<FindObjectBase> _findObjects { get; init; } = new();
-        public unsafe FNamePool* g_namePool { get; private set; }
-        public unsafe FUObjectArray* g_objectArray { get; private set; }
-
-        public ObjectSearch()
+        public ObjectSearch(ClassConstructorContext context, Dictionary<string, ModuleBase<ClassConstructorContext>> modules) : base(context, modules) 
         {
             _findObjectThread = new Thread(new ThreadStart(ProcessObjectQueue));
             _findObjectThread.IsBackground = true;
             _findObjectThread.Start();
+        }
+
+        public override void Register()
+        {
+
         }
 
         public abstract class FindObjectBase
@@ -82,15 +85,13 @@ namespace Unreal.ClassConstructor
 
         private unsafe void ForEachObject(Action<nint> objItem)
         {
-            for (int i = 0; i < g_objectArray->NumElements; i++)
+            for (int i = 0; i < _context.g_objectArray->NumElements; i++)
             {
-                var currObj = &g_objectArray->Objects[i >> 0x10][i & 0xffff];
+                var currObj = &_context.g_objectArray->Objects[i >> 0x10][i & 0xffff];
                 if (currObj->Object == null || (currObj->Flags & EInternalObjectFlags.Unreachable) != 0) continue;
                 objItem((nint)currObj);
             }
         }
-        private unsafe bool DoesNameMatch(UObject* tgtObj, string name) => g_namePool->GetString(tgtObj->NamePrivate).Equals(name);
-        private unsafe bool DoesClassMatch(UObject* tgtObj, string name) => g_namePool->GetString(((UObject*)tgtObj->ClassPrivate)->NamePrivate).Equals(name);
 
         // Synchronous operations for finding objects. This will block the caller thread for a while
         public unsafe UObject* FindObject(string targetObj, string? objType = null)
@@ -99,9 +100,9 @@ namespace Unreal.ClassConstructor
             ForEachObject(currAddr =>
             {
                 var currObj = (FUObjectItem*)currAddr;
-                if (DoesNameMatch(currObj->Object, targetObj))
+                if (_context.DoesNameMatch(currObj->Object, targetObj))
                 {
-                    if (objType == null || DoesClassMatch(currObj->Object, objType))
+                    if (objType == null || _context.DoesClassMatch(currObj->Object, objType))
                     {
                         ret = currObj->Object;
                         return;
@@ -116,9 +117,9 @@ namespace Unreal.ClassConstructor
             ForEachObject(currAddr =>
             {
                 var currObj = (FUObjectItem*)currAddr;
-                if (DoesNameMatch(currObj->Object, targetObj))
+                if (_context.DoesNameMatch(currObj->Object, targetObj))
                 {
-                    if (objType == null || DoesClassMatch(currObj->Object, objType))
+                    if (objType == null || _context.DoesClassMatch(currObj->Object, objType))
                         objects.Add((nint)currObj->Object);
                 }
             });
@@ -130,7 +131,7 @@ namespace Unreal.ClassConstructor
             ForEachObject(currAddr =>
             {
                 var currObj = (FUObjectItem*)currAddr;
-                if (DoesClassMatch(currObj->Object, objType))
+                if (_context.DoesClassMatch(currObj->Object, objType))
                 {
                     ret = currObj->Object;
                     return;
@@ -144,7 +145,7 @@ namespace Unreal.ClassConstructor
             ForEachObject(currAddr =>
             {
                 var currObj = (FUObjectItem*)currAddr;
-                if (DoesClassMatch(currObj->Object, objType))
+                if (_context.DoesClassMatch(currObj->Object, objType))
                     objects.Add((nint)currObj->Object);
             });
             return objects;
@@ -169,5 +170,7 @@ namespace Unreal.ClassConstructor
         }
 
         public unsafe UObject* GetEngineTransient() => FindObject("/Engine/Transient", "Package");
+        public unsafe UClass* GetType(string type) => (UClass*)FindObject(type, "Class");
+        public unsafe void GetTypeAsync(string type, Action<nint> foundCb) => FindObjectAsync(type, "Class", foundCb);
     }
 }

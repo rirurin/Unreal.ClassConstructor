@@ -1,8 +1,13 @@
-﻿using Reloaded.Hooks.ReloadedII.Interfaces;
+﻿using p3rpc.commonmodutils;
+using Unreal.NativeTypes.Interfaces;
+using Reloaded.Hooks.ReloadedII.Interfaces;
+using Reloaded.Memory;
+using Reloaded.Memory.SigScan.ReloadedII.Interfaces;
 using Reloaded.Mod.Interfaces;
 using SharedScans.Interfaces;
 using System.Diagnostics;
 using Unreal.ClassConstructor.Configuration;
+using Unreal.ClassConstructor.Interfaces;
 using Unreal.ClassConstructor.Template;
 
 namespace Unreal.ClassConstructor
@@ -10,7 +15,7 @@ namespace Unreal.ClassConstructor
     /// <summary>
     /// Your mod logic goes here.
     /// </summary>
-    public class Mod : ModBase // <= Do not Remove.
+    public class Mod : ModBase, IExports // <= Do not Remove.
     {
         /// <summary>
         /// Provides access to the mod loader API.
@@ -43,9 +48,8 @@ namespace Unreal.ClassConstructor
         /// </summary>
         private readonly IModConfig _modConfig;
 
-        private ObjectImports _imports;
-        private long _baseAddress;
-        private HookState _hookState;
+        private ClassConstructorContext _context;
+        private ModuleRuntime<ClassConstructorContext> _modRuntime;
 
         public Mod(ModContext context)
         {
@@ -58,12 +62,31 @@ namespace Unreal.ClassConstructor
 
             var mainModule = Process.GetCurrentProcess().MainModule;
             if (mainModule == null) throw new Exception($"[{_modConfig.ModName}] Could not get main module");
-            _baseAddress = mainModule.BaseAddress;
-            _modLoader.GetController<ISharedScans>().TryGetTarget(out var sharedScans);
             if (_hooks == null) throw new Exception($"[{_modConfig.ModName}] Could not get controller for Reloaded hooks");
+            _modLoader.GetController<ISharedScans>().TryGetTarget(out var sharedScans);
             if (sharedScans == null) throw new Exception($"[{_modConfig.ModName}] Could not get controller for Shared Scans");
-            _hookState = new(sharedScans, _baseAddress, _hooks);
-            _imports = new(_hookState);
+            _modLoader.GetController<IStartupScanner>().TryGetTarget(out var startupScanner);
+            if (startupScanner == null) throw new Exception($"[{_modConfig.ModName}] Could not get controller for Startup Scans");
+            _modLoader.GetController<IMemoryMethods>().TryGetTarget(out var memoryMethods);
+            if (memoryMethods == null) throw new Exception($"[{_modConfig.ModName}] Could not get controller for Memory Methods");
+            Utils utils = new(startupScanner, _logger, _hooks, mainModule.BaseAddress, "Class Constructor", System.Drawing.Color.PeachPuff);
+            Memory memory = new Memory();
+            _context = new(mainModule.BaseAddress, _configuration, _logger, startupScanner, _hooks, _modLoader.GetDirectoryForModId(_modConfig.ModId), utils, memory, sharedScans, memoryMethods);
+            _modRuntime = new(_context);
+
+            _modRuntime.AddModule<ObjectSearch>();
+            _modRuntime.AddModule<ObjectUtilities>();
+            _modRuntime.AddModule<ObjectListeners>();
+            _modRuntime.AddModule<ClassExtender>();
+            _modRuntime.AddModule<ClassFactory>();
+            _modRuntime.AddModule<ClassHooks>();
+            _modRuntime.RegisterModules();
+
+            _modLoader.AddOrReplaceController<IClassExtender>(_owner, _modRuntime.GetModule<ClassExtender>());
+            _modLoader.AddOrReplaceController<IClassFactory>(_owner, _modRuntime.GetModule<ClassFactory>());
+            _modLoader.AddOrReplaceController<IObjectListeners>(_owner, _modRuntime.GetModule<ObjectListeners>());
+            _modLoader.AddOrReplaceController<IObjectSearch>(_owner, _modRuntime.GetModule<ObjectSearch>());
+            _modLoader.AddOrReplaceController<IObjectUtilities>(_owner, _modRuntime.GetModule<ObjectUtilities>());
         }
 
         #region Standard Overrides
@@ -81,5 +104,13 @@ namespace Unreal.ClassConstructor
         public Mod() { }
 #pragma warning restore CS8618
         #endregion
+
+        public Type[] GetTypes() => new[] { 
+            typeof(IClassExtender),
+            typeof(IClassFactory),
+            typeof(IObjectListeners), 
+            typeof(IObjectSearch), 
+            typeof(IObjectUtilities) 
+        };
     }
 }

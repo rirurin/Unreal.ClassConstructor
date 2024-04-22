@@ -10,12 +10,13 @@
   "ModR2RManagedDll64": "x64/Unreal.ClassConstructor.dll",
   "ModNativeDll32": "",
   "ModNativeDll64": "",
-  "IsLibrary": false,
+  "IsLibrary": true,
   "ReleaseMetadataFileName": "Unreal.ClassConstructor.ReleaseMetadata.json",
   "PluginData": {},
   "IsUniversalMod": false,
   "ModDependencies": [
-    "p3rpc.nativetypes",
+    "Unreal.NativeTypes",
+    "Reloaded.Memory.SigScan.ReloadedII",
     "reloaded.sharedlib.hooks",
     "SharedScans.Reloaded"
   ],

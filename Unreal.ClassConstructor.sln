@@ -6,7 +6,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Unreal.ClassConstructor", "
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SharedScans.Interfaces", "include\SharedScans\SharedScans.Interfaces\SharedScans.Interfaces.csproj", "{82B500A3-E828-463D-AB36-13C6A24E6F54}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Unreal.ClassConstructor.Interfaces", "Unreal.ClassConstructor.Interfaces\Unreal.ClassConstructor.Interfaces.csproj", "{9B0DAC88-341E-439B-9ADD-BED7B18B1208}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Unreal.ClassConstructor.Interfaces", "Unreal.ClassConstructor.Interfaces\Unreal.ClassConstructor.Interfaces.csproj", "{9B0DAC88-341E-439B-9ADD-BED7B18B1208}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "p3rpc.commonmodutils", "..\p3rpc.commonmodutils\p3rpc.commonmodutils\p3rpc.commonmodutils.csproj", "{DA01949B-4117-4C4D-A4DA-82667F6C1242}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -26,6 +28,10 @@ Global
 		{9B0DAC88-341E-439B-9ADD-BED7B18B1208}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9B0DAC88-341E-439B-9ADD-BED7B18B1208}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9B0DAC88-341E-439B-9ADD-BED7B18B1208}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DA01949B-4117-4C4D-A4DA-82667F6C1242}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DA01949B-4117-4C4D-A4DA-82667F6C1242}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DA01949B-4117-4C4D-A4DA-82667F6C1242}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DA01949B-4117-4C4D-A4DA-82667F6C1242}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
