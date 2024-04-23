@@ -13,6 +13,10 @@ namespace Unreal.ClassConstructor
         public IHook<IClassMethods.GetPrivateStaticClassBody> _staticClassBody { get; private set; }
         public UClass_DeferredRegister _deferredRegister { get; private set; }
         private string UClass_DeferredRegister_SIG = "40 53 48 83 EC 20 48 8B D9 E8 ?? ?? ?? ?? 48 8B 93 ?? ?? ?? ?? 48 8D 4C 24 ??";
+
+        public UObjectProcessRegistrants _processRegistrants { get; private set; }
+        private string UObjectProcessRegistrants_SIG = "48 8B C4 55 48 83 EC 70 48 89 58 ?? 48 8D 15 ?? ?? ?? ??";
+        public delegate void UObjectProcessRegistrants();
         private ObjectListeners __objectListeners;
         private ClassExtender __classExtender;
         private ClassFactory __classFactory;
@@ -21,7 +25,11 @@ namespace Unreal.ClassConstructor
             _context._sharedScans.CreateListener("StaticConstructObject_Internal", addr => _context._utils.AfterSigScan(addr, _context._utils.GetDirectAddress, addr => _staticConstructObject = _context._utils.MakeHooker<IClassMethods.StaticConstructObject_Internal>(StaticConstructObject_InternalImpl, addr)));
             _context._sharedScans.CreateListener("GetPrivateStaticClassBody", addr => _context._utils.AfterSigScan(addr, _context._utils.GetDirectAddress, addr => _staticClassBody = _context._utils.MakeHooker<IClassMethods.GetPrivateStaticClassBody>(GetPrivateStaticClassBodyImpl, addr)));
             _context._sharedScans.AddScan<UClass_DeferredRegister>(UClass_DeferredRegister_SIG);
-            _context._sharedScans.CreateListener<UClass_DeferredRegister>(addr => _context._utils.AfterSigScan(addr, _context._utils.GetDirectAddress, addr => _deferredRegister = _context._utils.MakeWrapper<UClass_DeferredRegister>(addr)));
+            _context._sharedScans.CreateListener<UClass_DeferredRegister>(addr => _context._utils.AfterSigScan(
+                addr, _context._utils.GetDirectAddress, addr => _deferredRegister = _context._utils.MakeWrapper<UClass_DeferredRegister>(addr)));
+            _context._sharedScans.AddScan<UObjectProcessRegistrants>(UObjectProcessRegistrants_SIG);
+            _context._sharedScans.CreateListener<UObjectProcessRegistrants>(addr => _context._utils.AfterSigScan(
+                addr, _context._utils.GetDirectAddress, addr => _processRegistrants = _context._utils.MakeWrapper<UObjectProcessRegistrants>(addr)));
         }
         public override void Register() 
         {
@@ -120,7 +128,6 @@ namespace Unreal.ClassConstructor
                     return;
                 }
                 retHook.OriginalFunction(x);
-                _context._utils.Log($"test hook from ctor! {*(nint*)x:X} (vtable {**(nint**)x:X})");
             };
             ctorHookReal += ctorHook;
             retHook = _context._utils.MakeHooker(ctorHookReal, addr).Activate();

@@ -109,8 +109,7 @@ namespace Unreal.ClassConstructor
             // if user defines any custom initialization code, run that now
             if (ctorUserDefined != null) dynClassCtor += ctorUserDefined;
             var ctorCsharpWrapper = _context._hooks.CreateReverseWrapper(dynClassCtor);
-            // fuck it
-            // we ball
+
             __classHooks._staticClassBody.OriginalFunction(
                 packageNameTemp, // packageName
                 nameTemp, // name
@@ -129,10 +128,20 @@ namespace Unreal.ClassConstructor
                 ctorCsharpWrapper.NativeFunctionPtr, // invoke our custom constructor
                 _dynConsts.STUB_RETURN, // vtable helper (always null)
                 superParams.AddReferantObjects, // add referenced objects
-                /*sibling*/superParams.SuperStaticClassFn, // [superClass]::StaticClass
-                /*sibling*/superParams.BaseStaticClassFn,  // UObject::StaticClass
-                0, 0 // not a dynamic class
+                siblingParams.SuperStaticClassFn, // [superClass]::StaticClass
+                siblingParams.BaseStaticClassFn,  // UObject::StaticClass
+                0, 0 // not a dynamic class according to UE
+                // dynamic classes should immediately register the new class (you'll be able to see it registered
+                // if it appears in UE4SS), but that doesn't appear to be the case
             );
+            // Since it's not a dynamic class, it'll be deferred onto the FPendingRegistrantInfo map
+            // We can process this new registrant by calling UObjectProcessRegistrants
+            // (directly invoking UObjectBase::DeferredRegister causes a crash shortly after)
+
+            // both methods crash in the same place (it can successfully spawn the object
+            // but it makes the garbage collector freak out)
+
+            //__classHooks._processRegistrants.Invoke();
             __classHooks._deferredRegister.Invoke(*dynClassPtr, classType, packageNameTemp, nameTemp);
             // goodbye!!!! :3
             _context._memoryMethods.FMemory_Free(packageNameTemp);
@@ -153,7 +162,11 @@ namespace Unreal.ClassConstructor
             NativeMemory.Clear(constructObject, (nuint)_context._memoryMethods.FMemory_GetAllocSize((nint)constructObject));
             constructObject->Class = targetClass;
             constructObject->Outer = outer;
-            //if (bMarkAsRootSet) constructObject->SetFlags |= EObjectFlags.MarkAsRootSet;
+            if (bMarkAsRootSet)
+            {
+                //constructObject->SetFlags |= EObjectFlags.MarkAsRootSet;
+                //constructObject->InternalSetFlags |= EInternalObjectFlags.RootSet;
+            }
             _context._utils.Log($"Calling StaticConstructObject_Internal, alloc size {_context._memoryMethods.FMemory_GetAllocSize((nint)constructObject)}");
             var newObj = __classHooks._staticConstructObject.OriginalFunction(constructObject);
             _context._memoryMethods.FMemory_Free(constructObject);
