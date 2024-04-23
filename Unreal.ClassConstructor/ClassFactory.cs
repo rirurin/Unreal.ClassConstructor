@@ -10,6 +10,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using Unreal.ClassConstructor.Interfaces;
+using static Unreal.ClassConstructor.Interfaces.IClassExtender;
 
 namespace Unreal.ClassConstructor
 {
@@ -39,74 +40,124 @@ namespace Unreal.ClassConstructor
             return alloc;
         }
 
-        // Custom class creation:
-        // Class defintion collection classes should move into their own mod (Unreal.ClassConstructor)
-        // so that only one instance of these structures exist at runtime
-        // move Unreal engine specific native types into Unreal.ModUtils (decrease size of p3rpc.nativetypes)
-        // p3rpc.commondmodutils will still be the main project to interface with these new packages, since
-        // there's nothing here that requires that it be P3RE (add exe detection + unique scans per game)
-        // UnrealSignatureBase
-        // -> UnrealSignatureP3RE
-        // -> UnrealSignatureSMTVV
-        // -> UnrealSignatureP6
-        // -> UnrealSignatureHiFiRUSH
-        // -> UnrealSignatureFF7RE
-        // DynClassCustomVtableEntry
-        // DynClassMakeParams (name, vtable size + alloc size, custom vtable entries), DynClassSuperParams (name, vtable size)
-        // CreateNewClass (class, superClass)
-        // ReplaceVtableEntry (index, funcptr)
-
         // Gaslights Unreal Engine into thinking that the game compiled with a class "name" by copying vtable information from
         // an existing class and retrieving appropriate constructors
-        public unsafe UClass* CreateClass(
+
+        // AActor vtable - 199 methods
+        // UObject vtable - 78 methods
+        public unsafe DynamicClass? CreateClass(
             string name,
             string superClassName,
             int newMethodCount, // superClassMethodCount + new methods to define
                                 // afaik there's no way to determine the size of a class's vtable, so this'll have to be determined by
                                 // checking how the vtable looks in a disassembler
             int superClassMethodCount,
-            int allocSize // superClassAllocSize + extra alloc for our new class
+            int allocSize, // superClassAllocSize + extra alloc for our new class
+            InternalConstructor? ctorUserDefined = null
         )
         {
-            _context._utils.Log($"{_dynConsts.STUB_VOID:X}, {_dynConsts.STUB_RETURN:X}");
+            // We need to get static class param info from two classes - the super class and a subclass of the super class (sibling class)
+            // GetPrivateStaticClassBody asks for an InternalConstructor, which we copy from super class and attach our own code onto.
+            // AddReferantObjects also comes from the super class, but Super ctor and Within ctor use sibling class
+            // Do this early, because this operation can fail (if you try to derive from a class with no derivates, it won't find a sibling)
             UClass* superClass = __objectSearch.GetType(superClassName);
-            // make fake vtable (vtableNative field in DynamicObject)
-            // we can point these vtable entries to other places later on (e.g to override AActor::Tick, we can redirect
-            // to our own)
+            UObject* siblingClass = __objectSearch.FindFirstSubclassOf(superClass);
+
+            if (superClass == null)
+            {
+                _context._utils.Log($"ERROR: Could not find an existing superclass with the name {name}", System.Drawing.Color.Red);
+                return null;
+            } 
+            else if (siblingClass == null)
+            {
+                _context._utils.Log($"ERROR: Could not find an appropriate sibling class for {name} (checked superclass {superClassName})", System.Drawing.Color.Red);
+                return null;
+            }
+            else _context._utils.Log($"Found sibling class @ 0x{(nint)siblingClass:X}");
+
+            _classNameToStaticClassParams.TryGetValue(
+                _context.GetObjectName((UObject*)siblingClass->ClassPrivate), out var siblingParams);
+            _classNameToStaticClassParams.TryGetValue(
+                _context.GetObjectName((UObject*)superClass), out var superParams);
+            UClass* classType = __objectSearch.GetType("Class"); // typeof(UClass) required for UObject::DeferredRegister
+            // Make a fake vtable. Copy entries from the superclass's vtable, then blank out any new entries.
+            // The mod user will be responsible for creating reverse wrappers to replace a particular vtable entry, which
+            // they'll store as a field in their mod (there's no way for us to predict the calling convention of these methods)
             nint* superVtable = (nint*)superClass->class_default_obj->_vtable;
             int totalMethodCount = superClassMethodCount + newMethodCount;
             nint* vtableMethods = (nint*)_context._memoryMethods.FMemory_Malloc(totalMethodCount * sizeof(nint), (uint)sizeof(nint));
+            // for each UE class, a global variable stores a pointer to the class pointer (fine to leak this)
             UClass** dynClassPtr = (UClass**)_context._memoryMethods.FMemory_Malloc(sizeof(nint), (uint)sizeof(nint));
-            for (int i = 0; i < superClassMethodCount; i++)
-                vtableMethods[i] = superVtable[i];
-            for (int i = superClassMethodCount; i < totalMethodCount; i++)
-                vtableMethods[i] = 0;
-            // Set names. We're gonna pretend that we're compiled as a Persona 3 Reload class
+            NativeMemory.Copy(superVtable, vtableMethods, (nuint)(superClassMethodCount * sizeof(nint)));
+            NativeMemory.Clear(vtableMethods + superClassMethodCount, (nuint)((totalMethodCount - superClassMethodCount) * sizeof(nint)));
+            // Create some FStrings used to pass arguments for what UE module this is from, the config.ini used and the name itself
+            // This currently assumes /Script/xrd777 (Persona 3 Reload) though there'll be an option to change this at some point
             nint packageNameTemp = StringToPtrUni("/Script/xrd777");
             nint nameTemp = StringToPtrUni(name);
             nint configTemp = StringToPtrUni("Engine");
-            // we're a subclass of AActor, so find a class that's also a subactor of AActor to get it's super StaticClass
-            // withinFn is pretty much always UObject::StaticClass
-            _classNameToStaticClassParams.TryGetValue("AppActor", out var appActorParams); // for superfn/withinfn
-            _classNameToStaticClassParams.TryGetValue("Actor", out var actorParams); // for ctor
-            UClass* classType = __objectSearch.GetType("Class");
-            _context._logger.WriteLine($"CLASS: {(nint)classType:X}");
-            // what the fuck
+            // we need to make our own internal constructor function so we can insert our custom vtable
+            var dynClassCtor = _context._hooks.CreateWrapper<InternalConstructor>(superParams.InternalConstructor, out _);
+            dynClassCtor += x => // vtable redirection
+            {
+                if (*(nint*)x != 0)
+                {
+                    UObject* xAlloc = *(UObject**)x;
+                    _context._utils.Log($"Redirected vtable ({xAlloc->_vtable:X} -> {(nint)vtableMethods:X})");
+                    xAlloc->_vtable = (nint)vtableMethods;
+                }
+            };
+            // if user defines any custom initialization code, run that now
+            if (ctorUserDefined != null) dynClassCtor += ctorUserDefined;
+            var ctorCsharpWrapper = _context._hooks.CreateReverseWrapper(dynClassCtor);
+            // fuck it
+            // we ball
             __classHooks._staticClassBody.OriginalFunction(
-                packageNameTemp, nameTemp, dynClassPtr,
-                _dynConsts.STUB_VOID, (uint)allocSize, (uint)sizeof(nuint),
-                (uint)(EClassFlags.CLASS_Intrinsic), (ulong)EClassCastFlags.CASTCLASS_None,
-                configTemp, actorParams.InternalConstructor, _dynConsts.STUB_VOID,
-                _dynConsts.STUB_VOID, appActorParams.SuperStaticClassFn,
-                appActorParams.BaseStaticClassFn, 0, 0
+                packageNameTemp, // packageName
+                nameTemp, // name
+                dynClassPtr, // returnClass
+                _dynConsts.STUB_VOID, // we're not defining any blueprints methods
+                (uint)allocSize, // size
+                (uint)sizeof(nuint), // align
+                (uint)( // flags
+                    /*EClassFlags.CLASS_Intrinsic | EClassFlags.CLASS_Native | 
+                    EClassFlags.CLASS_Constructed | EClassFlags.CLASS_RequiredAPI
+                    */
+                    EClassFlags.CLASS_Intrinsic
+                    ), 
+                (ulong)EClassCastFlags.CASTCLASS_None, // castFlags
+                configTemp, // config
+                ctorCsharpWrapper.NativeFunctionPtr, // invoke our custom constructor
+                _dynConsts.STUB_RETURN, // vtable helper (always null)
+                superParams.AddReferantObjects, // add referenced objects
+                /*sibling*/superParams.SuperStaticClassFn, // [superClass]::StaticClass
+                /*sibling*/superParams.BaseStaticClassFn,  // UObject::StaticClass
+                0, 0 // not a dynamic class
             );
             __classHooks._deferredRegister.Invoke(*dynClassPtr, classType, packageNameTemp, nameTemp);
             // goodbye!!!! :3
             _context._memoryMethods.FMemory_Free(packageNameTemp);
             _context._memoryMethods.FMemory_Free(nameTemp);
             _context._memoryMethods.FMemory_Free(configTemp);
-            _context._memoryMethods.FMemory_Free((nint)vtableMethods);
-            return *dynClassPtr;
+            // Return a dynamic class instance to neatly store data associated with our custom class
+            // It's the responsibility of the mod creator to store it so it doesn't get GC'd
+            return new DynamicClass(*dynClassPtr, vtableMethods, dynClassCtor, ctorCsharpWrapper);
+        }
+
+        public unsafe UObject* SpawnObject(string name, UObject* outer = null) => SpawnObject(__objectSearch.GetType(name), outer);
+
+        public unsafe UObject* SpawnObject(DynamicClass target, UObject* outer = null) => SpawnObject(target._instance, outer, true);
+        public unsafe UObject* SpawnObject(UClass* targetClass, UObject* outer = null, bool bMarkAsRootSet = false)
+        {
+            if (outer != null) outer = __objectSearch.GetEngineTransient();
+            var constructObject = _context._memoryMethods.FMemory_Malloc<FStaticConstructObjectParameters>(8);
+            NativeMemory.Clear(constructObject, (nuint)_context._memoryMethods.FMemory_GetAllocSize((nint)constructObject));
+            constructObject->Class = targetClass;
+            constructObject->Outer = outer;
+            //if (bMarkAsRootSet) constructObject->SetFlags |= EObjectFlags.MarkAsRootSet;
+            _context._utils.Log($"Calling StaticConstructObject_Internal, alloc size {_context._memoryMethods.FMemory_GetAllocSize((nint)constructObject)}");
+            var newObj = __classHooks._staticConstructObject.OriginalFunction(constructObject);
+            _context._memoryMethods.FMemory_Free(constructObject);
+            return newObj;
         }
     }
 }

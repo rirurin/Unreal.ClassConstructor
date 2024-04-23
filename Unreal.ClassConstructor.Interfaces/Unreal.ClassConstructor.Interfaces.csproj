@@ -14,7 +14,7 @@
 	  <PackageId>Unreal.ClassConstructor.Interfaces</PackageId>
 
 	  <!-- Use Semantic Versioning -->
-	  <Version>1.0.0</Version>
+	  <Version>1.0.1</Version>
 	  <Authors>Rirurin</Authors>
 
 	  <!-- Description of your Package -->
@@ -29,7 +29,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Unreal.NativeTypes.Interfaces" Version="1.0.0" />
+    <PackageReference Include="Reloaded.Hooks.Definitions" Version="1.15.0" />
+    <PackageReference Include="Unreal.NativeTypes.Interfaces" Version="1.0.2" />
   </ItemGroup>
 
 </Project>

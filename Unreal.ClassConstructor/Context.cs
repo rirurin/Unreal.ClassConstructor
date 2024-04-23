@@ -59,6 +59,14 @@ namespace Unreal.ClassConstructor
             }
             return false;
         }
+        public unsafe bool IsObjectDirectSubclassOf(UObject* obj, UClass* type)
+        {
+            var currType = obj->ClassPrivate;
+            if (GetObjectName((UObject*)currType).Equals("Object")) return false; // UObject is base class, can't get superclass of that
+            var superType = (UClass*)currType->_super.super_struct;
+            if (((UObject*)superType)->NamePrivate.Equals(((UObject*)type)->NamePrivate)) return true;
+            return false;
+        }
         public unsafe bool DoesNameMatch(UObject* tgtObj, string name) => g_namePool->GetString(tgtObj->NamePrivate).Equals(name);
         public unsafe bool DoesClassMatch(UObject* tgtObj, string name) => g_namePool->GetString(((UObject*)tgtObj->ClassPrivate)->NamePrivate).Equals(name);
     }

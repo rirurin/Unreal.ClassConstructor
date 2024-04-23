@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Unreal.ClassConstructor.Interfaces;
+using System.Data;
 
 namespace Unreal.ClassConstructor
 {
@@ -150,6 +151,28 @@ namespace Unreal.ClassConstructor
             });
             return objects;
         }
+
+        public unsafe UObject* FindFirstSubclassOf(string objType)
+        {
+            UObject* ret = null;
+            UClass* super = GetType(objType);
+            return FindFirstSubclassOf(super);
+        }
+        public unsafe UObject* FindFirstSubclassOf(UClass* super)
+        {
+            UObject* ret = null;
+            ForEachObject(currAddr =>
+            {
+                var currObj = (FUObjectItem*)currAddr;
+                if (_context.IsObjectDirectSubclassOf(currObj->Object, super))
+                {
+                    ret = currObj->Object;
+                    return;
+                }
+            });
+            return ret;
+        }
+
         // Async object finding operations
         public unsafe void FindObjectAsync(string targetObj, string? objType, Action<nint> foundCb) => _findObjects.Add(new FindObjectByName(this, targetObj, objType, foundCb));
         public unsafe void FindObjectAsync(string targetObj, Action<nint> foundCb) => FindObjectAsync(targetObj, null, foundCb);

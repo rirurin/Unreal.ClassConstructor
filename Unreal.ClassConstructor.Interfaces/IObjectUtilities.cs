@@ -1,15 +1,14 @@
-﻿using Unreal.NativeTypes.Interfaces;
+﻿#pragma warning disable CS1591
+using Unreal.NativeTypes.Interfaces;
+namespace Unreal.ClassConstructor.Interfaces;
 
-namespace Unreal.ClassConstructor.Interfaces
+public interface IObjectUtilities
 {
-    public interface IObjectUtilities
-    {
-        public string GetFName(FName name);
-        public unsafe string GetObjectName(UObject* obj);
-        public unsafe string GetFullName(UObject* obj);
-        public unsafe string GetObjectType(UObject* obj);
-        public unsafe bool IsObjectSubclassOf(UObject* obj, UClass* type);
-        public unsafe bool DoesNameMatch(UObject* tgtObj, string name);
-        public unsafe bool DoesClassMatch(UObject* tgtObj, string name);
-    }
+    public string GetFName(FName name);
+    public unsafe string GetObjectName(UObject* obj);
+    public unsafe string GetFullName(UObject* obj);
+    public unsafe string GetObjectType(UObject* obj);
+    public unsafe bool IsObjectSubclassOf(UObject* obj, UClass* type);
+    public unsafe bool DoesNameMatch(UObject* tgtObj, string name);
+    public unsafe bool DoesClassMatch(UObject* tgtObj, string name);
 }

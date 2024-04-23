@@ -3,6 +3,7 @@ using Unreal.NativeTypes.Interfaces;
 using Reloaded.Hooks.Definitions;
 using SharedScans.Interfaces;
 using System.Runtime.InteropServices;
+using static Unreal.ClassConstructor.Interfaces.IClassExtender;
 
 namespace Unreal.ClassConstructor
 {
@@ -12,12 +13,9 @@ namespace Unreal.ClassConstructor
         public IHook<IClassMethods.GetPrivateStaticClassBody> _staticClassBody { get; private set; }
         public UClass_DeferredRegister _deferredRegister { get; private set; }
         private string UClass_DeferredRegister_SIG = "40 53 48 83 EC 20 48 8B D9 E8 ?? ?? ?? ?? 48 8B 93 ?? ?? ?? ?? 48 8D 4C 24 ??";
-
         private ObjectListeners __objectListeners;
         private ClassExtender __classExtender;
         private ClassFactory __classFactory;
-
-
         public unsafe ClassHooks(ClassConstructorContext context, Dictionary<string, ModuleBase<ClassConstructorContext>> modules) : base(context, modules) 
         {
             _context._sharedScans.CreateListener("StaticConstructObject_Internal", addr => _context._utils.AfterSigScan(addr, _context._utils.GetDirectAddress, addr => _staticConstructObject = _context._utils.MakeHooker<IClassMethods.StaticConstructObject_Internal>(StaticConstructObject_InternalImpl, addr)));
@@ -108,13 +106,13 @@ namespace Unreal.ClassConstructor
             _staticClassBody.OriginalFunction(packageName, name, returnClass, registerNativeFunc, size, align, flags, castFlags,
                 config, inClassCtor, vtableHelperCtorCaller, addRefObjects, superFn, withinFn, isDynamic, dynamicFn);
         }
-        public unsafe IHook<ClassExtenderParams.InternalConstructor> FollowThunkToGetAppropriateHook
-            (nint addr, ClassExtenderParams.InternalConstructor ctorHook)
+        public unsafe IHook<InternalConstructor> FollowThunkToGetAppropriateHook
+            (nint addr, InternalConstructor ctorHook)
         {
             // build a new multicast delegate by injecting the native function, followed by custom code
             // this reference will live for program's lifetime so there's no need to store hook in the caller
-            IHook<ClassExtenderParams.InternalConstructor>? retHook = null;
-            ClassExtenderParams.InternalConstructor ctorHookReal = x =>
+            IHook<InternalConstructor>? retHook = null;
+            InternalConstructor ctorHookReal = x =>
             {
                 if (retHook == null)
                 {

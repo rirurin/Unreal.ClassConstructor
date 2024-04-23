@@ -2,7 +2,7 @@
   "ModId": "Unreal.ClassConstructor",
   "ModName": "Unreal Class Constructor",
   "ModAuthor": "Rirurin",
-  "ModVersion": "1.0.0",
+  "ModVersion": "1.0.1",
   "ModDescription": "Utilities for modifying and creating classes/objects",
   "ModDll": "Unreal.ClassConstructor.dll",
   "ModIcon": "Preview.png",

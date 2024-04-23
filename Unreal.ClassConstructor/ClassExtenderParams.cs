@@ -1,7 +1,8 @@
 ﻿#pragma warning disable CS1591
 using Reloaded.Hooks.Definitions;
+using static Unreal.ClassConstructor.Interfaces.IClassExtender;
 
-namespace p3rpc.commonmodutils
+namespace Unreal.ClassConstructor
 {
     // Extend a particular class (increase size, hook to ctor)
     public class ClassExtenderParams
@@ -16,7 +17,5 @@ namespace p3rpc.commonmodutils
             CtorHook = ctorHook;
             CtorHookReal = null;
         }
-
-        public unsafe delegate void InternalConstructor(nint alloc);
     }
 }

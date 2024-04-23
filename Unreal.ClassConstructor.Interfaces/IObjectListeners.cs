@@ -1,4 +1,5 @@
-﻿using Unreal.NativeTypes.Interfaces;
+﻿#pragma warning disable CS1591
+using Unreal.NativeTypes.Interfaces;
 namespace Unreal.ClassConstructor.Interfaces;
 public interface IObjectListeners
 {
