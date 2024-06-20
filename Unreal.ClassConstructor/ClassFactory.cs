@@ -1,4 +1,4 @@
-﻿using p3rpc.commonmodutils;
+﻿using riri.commonmodutils;
 using Unreal.NativeTypes.Interfaces;
 using Reloaded.Memory;
 using Reloaded.Mod.Interfaces;
@@ -18,7 +18,7 @@ namespace Unreal.ClassConstructor
     {
         private DynamicClassConstants _dynConsts;
 
-        private ObjectSearch __objectSearch;
+        private ObjectMethods __objectMethods;
         private ClassHooks __classHooks;
         public ConcurrentDictionary<string, StaticClassParams> _classNameToStaticClassParams { get; private init; } = new();
         public ClassFactory(ClassConstructorContext context, Dictionary<string, ModuleBase<ClassConstructorContext>> modules) : base(context, modules) 
@@ -27,7 +27,7 @@ namespace Unreal.ClassConstructor
         }
         public override void Register() 
         {
-            __objectSearch = GetModule<ObjectSearch>();
+            __objectMethods = GetModule<ObjectMethods>();
             __classHooks = GetModule<ClassHooks>();
         }
 
@@ -60,8 +60,8 @@ namespace Unreal.ClassConstructor
             // GetPrivateStaticClassBody asks for an InternalConstructor, which we copy from super class and attach our own code onto.
             // AddReferantObjects also comes from the super class, but Super ctor and Within ctor use sibling class
             // Do this early, because this operation can fail (if you try to derive from a class with no derivates, it won't find a sibling)
-            UClass* superClass = __objectSearch.GetType(superClassName);
-            UObject* siblingClass = __objectSearch.FindFirstSubclassOf(superClass);
+            UClass* superClass = __objectMethods.GetType(superClassName);
+            UObject* siblingClass = __objectMethods.FindFirstSubclassOf(superClass);
 
             if (superClass == null)
             {
@@ -79,7 +79,7 @@ namespace Unreal.ClassConstructor
                 _context.GetObjectName((UObject*)siblingClass->ClassPrivate), out var siblingParams);
             _classNameToStaticClassParams.TryGetValue(
                 _context.GetObjectName((UObject*)superClass), out var superParams);
-            UClass* classType = __objectSearch.GetType("Class"); // typeof(UClass) required for UObject::DeferredRegister
+            UClass* classType = __objectMethods.GetType("Class"); // typeof(UClass) required for UObject::DeferredRegister
             // Make a fake vtable. Copy entries from the superclass's vtable, then blank out any new entries.
             // The mod user will be responsible for creating reverse wrappers to replace a particular vtable entry, which
             // they'll store as a field in their mod (there's no way for us to predict the calling convention of these methods)
@@ -152,12 +152,12 @@ namespace Unreal.ClassConstructor
             return new DynamicClass(*dynClassPtr, vtableMethods, dynClassCtor, ctorCsharpWrapper);
         }
 
-        public unsafe UObject* SpawnObject(string name, UObject* outer = null) => SpawnObject(__objectSearch.GetType(name), outer);
+        public unsafe UObject* SpawnObject(string name, UObject* outer = null) => SpawnObject(__objectMethods.GetType(name), outer);
 
         public unsafe UObject* SpawnObject(DynamicClass target, UObject* outer = null) => SpawnObject(target._instance, outer, true);
         public unsafe UObject* SpawnObject(UClass* targetClass, UObject* outer = null, bool bMarkAsRootSet = false)
         {
-            if (outer != null) outer = __objectSearch.GetEngineTransient();
+            if (outer != null) outer = __objectMethods.GetEngineTransient();
             var constructObject = _context._memoryMethods.FMemory_Malloc<FStaticConstructObjectParameters>(8);
             NativeMemory.Clear(constructObject, (nuint)_context._memoryMethods.FMemory_GetAllocSize((nint)constructObject));
             constructObject->Class = targetClass;

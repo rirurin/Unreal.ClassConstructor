@@ -1,5 +1,4 @@
-﻿using p3rpc.commonmodutils;
-using Unreal.NativeTypes.Interfaces;
+﻿using Unreal.NativeTypes.Interfaces;
 using Reloaded.Hooks.ReloadedII.Interfaces;
 using Reloaded.Memory;
 using Reloaded.Memory.SigScan.ReloadedII.Interfaces;
@@ -9,6 +8,7 @@ using System.Diagnostics;
 using Unreal.ClassConstructor.Configuration;
 using Unreal.ClassConstructor.Interfaces;
 using Unreal.ClassConstructor.Template;
+using riri.commonmodutils;
 
 namespace Unreal.ClassConstructor
 {
@@ -51,6 +51,8 @@ namespace Unreal.ClassConstructor
         private ClassConstructorContext _context;
         private ModuleRuntime<ClassConstructorContext> _modRuntime;
 
+        private CommonMethods _commonMethods;
+
         public Mod(ModContext context)
         {
             _modLoader = context.ModLoader;
@@ -71,22 +73,28 @@ namespace Unreal.ClassConstructor
             if (memoryMethods == null) throw new Exception($"[{_modConfig.ModName}] Could not get controller for Memory Methods");
             Utils utils = new(startupScanner, _logger, _hooks, mainModule.BaseAddress, "Class Constructor", System.Drawing.Color.PeachPuff);
             Memory memory = new Memory();
+            
             _context = new(mainModule.BaseAddress, _configuration, _logger, startupScanner, _hooks, _modLoader.GetDirectoryForModId(_modConfig.ModId), utils, memory, sharedScans, memoryMethods);
             _modRuntime = new(_context);
 
-            _modRuntime.AddModule<ObjectSearch>();
-            _modRuntime.AddModule<ObjectUtilities>();
-            _modRuntime.AddModule<ObjectListeners>();
+            _commonMethods = new(sharedScans);
+
+            _modRuntime.AddModule<ObjectSearch_DEPRECATED>();
+            _modRuntime.AddModule<ObjectUtilities_DEPRECATED>();
+            _modRuntime.AddModule<ObjectListeners_DEPRECATED>();
             _modRuntime.AddModule<ClassExtender>();
             _modRuntime.AddModule<ClassFactory>();
+
             _modRuntime.AddModule<ClassHooks>();
+            _modRuntime.AddModule<ObjectMethods>();
             _modRuntime.RegisterModules();
 
             _modLoader.AddOrReplaceController<IClassExtender>(_owner, _modRuntime.GetModule<ClassExtender>());
             _modLoader.AddOrReplaceController<IClassFactory>(_owner, _modRuntime.GetModule<ClassFactory>());
-            _modLoader.AddOrReplaceController<IObjectListeners>(_owner, _modRuntime.GetModule<ObjectListeners>());
-            _modLoader.AddOrReplaceController<IObjectSearch>(_owner, _modRuntime.GetModule<ObjectSearch>());
-            _modLoader.AddOrReplaceController<IObjectUtilities>(_owner, _modRuntime.GetModule<ObjectUtilities>());
+            _modLoader.AddOrReplaceController<IObjectListeners>(_owner, _modRuntime.GetModule<ObjectListeners_DEPRECATED>());
+            _modLoader.AddOrReplaceController<IObjectSearch>(_owner, _modRuntime.GetModule<ObjectSearch_DEPRECATED>());
+            _modLoader.AddOrReplaceController<IObjectUtilities>(_owner, _modRuntime.GetModule<ObjectUtilities_DEPRECATED>());
+            _modLoader.AddOrReplaceController<IObjectMethods>(_owner, _modRuntime.GetModule<ObjectMethods>());
         }
 
         #region Standard Overrides
@@ -110,7 +118,8 @@ namespace Unreal.ClassConstructor
             typeof(IClassFactory),
             typeof(IObjectListeners), 
             typeof(IObjectSearch), 
-            typeof(IObjectUtilities) 
+            typeof(IObjectUtilities),
+            typeof(IObjectMethods)
         };
     }
 }

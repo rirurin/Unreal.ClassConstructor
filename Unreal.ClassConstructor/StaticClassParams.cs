@@ -1,7 +1,7 @@
 ﻿using Unreal.NativeTypes.Interfaces;
 
 #pragma warning disable CS1591
-namespace p3rpc.commonmodutils
+namespace Unreal.ClassConstructor
 {
     public class StaticClassParams
     {

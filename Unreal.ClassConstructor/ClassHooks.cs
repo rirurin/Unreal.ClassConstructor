@@ -1,9 +1,10 @@
-﻿using p3rpc.commonmodutils;
+﻿using riri.commonmodutils;
 using Unreal.NativeTypes.Interfaces;
 using Reloaded.Hooks.Definitions;
 using SharedScans.Interfaces;
 using System.Runtime.InteropServices;
 using static Unreal.ClassConstructor.Interfaces.IClassExtender;
+using System.Numerics;
 
 namespace Unreal.ClassConstructor
 {
@@ -17,9 +18,27 @@ namespace Unreal.ClassConstructor
         public UObjectProcessRegistrants _processRegistrants { get; private set; }
         private string UObjectProcessRegistrants_SIG = "48 8B C4 55 48 83 EC 70 48 89 58 ?? 48 8D 15 ?? ?? ?? ??";
         public delegate void UObjectProcessRegistrants();
-        private ObjectListeners __objectListeners;
+
+        private string UWorld_SpawnActor_SIG = "40 55 53 56 57 41 54 41 55 41 56 41 57 48 8D AC 24 ?? ?? ?? ?? 48 81 EC F8 01 00 00 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 45 ??";
+        public UWorld_SpawnActor _spawnActor;
+        public unsafe delegate AActor* UWorld_SpawnActor(UWorld* self, UClass* type, FTransform* pUserTransform, FActorSpawnParameters* spawnParams);
+
+        public FName_Ctor _fnameCtor;
+        private string FNameCtor_SIG = "48 89 5C 24 ?? 57 48 83 EC 30 48 8B D9 48 89 54 24 ?? 33 C9 41 8B F8 4C 8B DA";
+        public unsafe delegate FName* FName_Ctor(FName* self, nint name, EFindType findType);
+
+        private string FUObjectHashTables_Get_SIG = "E8 ?? ?? ?? ?? 48 8B F8 33 C0 F0 0F B1 35 ?? ?? ?? ??";
+        public FUObjectHashTables_Get _getObjectHashTables;
+        public unsafe delegate FUObjectHashTables* FUObjectHashTables_Get();
+
+        private string GEngine_SIG = "48 89 05 ?? ?? ?? ?? 48 85 C9 74 ?? E8 ?? ?? ?? ?? 48 8D 4D ??"; // in FEngineLoop::Init
+
         private ClassExtender __classExtender;
         private ClassFactory __classFactory;
+        private ObjectMethods __objectMethods;
+
+        public unsafe UEngine** GEngine;
+
         public unsafe ClassHooks(ClassConstructorContext context, Dictionary<string, ModuleBase<ClassConstructorContext>> modules) : base(context, modules) 
         {
             _context._sharedScans.CreateListener("StaticConstructObject_Internal", addr => _context._utils.AfterSigScan(addr, _context._utils.GetDirectAddress, addr => _staticConstructObject = _context._utils.MakeHooker<IClassMethods.StaticConstructObject_Internal>(StaticConstructObject_InternalImpl, addr)));
@@ -30,27 +49,41 @@ namespace Unreal.ClassConstructor
             _context._sharedScans.AddScan<UObjectProcessRegistrants>(UObjectProcessRegistrants_SIG);
             _context._sharedScans.CreateListener<UObjectProcessRegistrants>(addr => _context._utils.AfterSigScan(
                 addr, _context._utils.GetDirectAddress, addr => _processRegistrants = _context._utils.MakeWrapper<UObjectProcessRegistrants>(addr)));
+
+            _context._utils.SigScan(UWorld_SpawnActor_SIG, "UWorld::SpawnActor", _context._utils.GetDirectAddress,
+                addr => _spawnActor = _context._utils.MakeWrapper<UWorld_SpawnActor>(addr));
+
+            _context._sharedScans.AddScan<FName_Ctor>(FNameCtor_SIG);
+            _context._sharedScans.CreateListener<FName_Ctor>(addr => _context._utils.AfterSigScan(
+                addr, _context._utils.GetDirectAddress, addr => _fnameCtor = _context._utils.MakeWrapper<FName_Ctor>(addr)));
+
+            _context._sharedScans.AddScan("GEngine", GEngine_SIG);
+            _context._sharedScans.CreateListener("GEngine", addr => _context._utils.AfterSigScan(
+                addr, _context._utils.GetIndirectAddressLong, addr => GEngine = (UEngine**)addr));
         }
         public override void Register() 
         {
             // Resolve imports
-            __objectListeners = GetModule<ObjectListeners>();
             __classExtender = GetModule<ClassExtender>();
             __classFactory = GetModule<ClassFactory>();
+            //__objectListeners = GetModule<ObjectListeners>();
+            //__objectUtilities = GetModule<ObjectUtilities>();
+            __objectMethods = GetModule<ObjectMethods>();
         }
 
         public unsafe delegate void UClass_DeferredRegister(UClass* self, UClass* type, nint packageName, nint name);
 
-        private unsafe UObject* StaticConstructObject_InternalImpl(FStaticConstructObjectParameters* pParams)
+        public unsafe UObject* StaticConstructObject_InternalImpl(FStaticConstructObjectParameters* pParams)
         {
             var newObj = _staticConstructObject.OriginalFunction(pParams);
-            if (__objectListeners._objectListeners.TryGetValue(_context.GetObjectType(newObj), out var listeners))
+            if (__objectMethods._objectListeners.TryGetValue(_context.GetObjectType(newObj), out var listeners))
                 foreach (var listener in listeners) listener((nint)newObj);
             return newObj;
         }
 
         // Scuffed Unreal class manipulation
 
+        
         private unsafe void GetPrivateStaticClassBodyImpl(
             nint packageName,
             nint name,

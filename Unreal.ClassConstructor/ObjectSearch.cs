@@ -1,4 +1,4 @@
-﻿using p3rpc.commonmodutils;
+﻿using riri.commonmodutils;
 using Unreal.NativeTypes.Interfaces;
 using System;
 using System.Collections.Concurrent;
@@ -11,26 +11,40 @@ using System.Data;
 
 namespace Unreal.ClassConstructor
 {
-    public class ObjectSearch : ModuleBase<ClassConstructorContext>, IObjectSearch
+    public class ObjectSearch_DEPRECATED : ModuleBase<ClassConstructorContext>, IObjectSearch
     {
-        private Thread _findObjectThread { get; init; }
-        private BlockingCollection<FindObjectBase> _findObjects { get; init; } = new();
-        public ObjectSearch(ClassConstructorContext context, Dictionary<string, ModuleBase<ClassConstructorContext>> modules) : base(context, modules) 
-        {
-            _findObjectThread = new Thread(new ThreadStart(ProcessObjectQueue));
-            _findObjectThread.IsBackground = true;
-            _findObjectThread.Start();
-        }
+        private ObjectMethods _objectMethods;
+        public ObjectSearch_DEPRECATED(ClassConstructorContext context, Dictionary<string, ModuleBase<ClassConstructorContext>> modules) : base(context, modules) 
+        {}
 
         public override void Register()
         {
-
+            _objectMethods = GetModule<ObjectMethods>();
         }
 
+        // Synchronous operations for finding objects. This will block the caller thread for a while
+        public unsafe UObject* FindObject(string targetObj, string? objType = null) => _objectMethods.FindObject(targetObj, objType);
+        public unsafe ICollection<nint> FindAllObjectsNamed(string targetObj, string? objType = null) => _objectMethods.FindAllObjectsNamed(targetObj, objType);
+        public unsafe UObject* FindFirstOf(string objType) => _objectMethods.FindFirstOf(objType);
+        public unsafe ICollection<nint> FindAllOf(string objType) => _objectMethods.FindAllOf(objType);
+
+        // Async object finding operations
+        public unsafe void FindObjectAsync(string targetObj, string? objType, Action<nint> foundCb) => _objectMethods.FindObjectAsync(targetObj, objType, foundCb);
+        public unsafe void FindObjectAsync(string targetObj, Action<nint> foundCb) => _objectMethods.FindObjectAsync(targetObj, foundCb);
+        public unsafe void FindFirstOfAsync(string objType, Action<nint> foundCb) => _objectMethods.FindFirstOfAsync(objType, foundCb);
+        public unsafe void FindAllOfAsync(string objType, Action<ICollection<nint>> foundCb) => _objectMethods.FindAllOfAsync(objType, foundCb);
+
+        public unsafe UObject* GetEngineTransient() => _objectMethods.GetEngineTransient();
+        public unsafe UClass* GetType(string type) => _objectMethods.GetType(type);
+        public unsafe void GetTypeAsync(string type, Action<nint> foundCb) => _objectMethods.GetTypeAsync(type, foundCb);
+    }
+
+    internal partial class ObjectMethods : ModuleBase<ClassConstructorContext>, IObjectMethods
+    {
         public abstract class FindObjectBase
         {
-            protected ObjectSearch Context { get; init; }
-            public FindObjectBase(ObjectSearch context) { Context = context; }
+            protected ObjectMethods Context { get; init; }
+            public FindObjectBase(ObjectMethods context) { Context = context; }
             public abstract void Execute();
         }
         public class FindObjectByName : FindObjectBase
@@ -38,7 +52,7 @@ namespace Unreal.ClassConstructor
             public string ObjectName { get; set; }
             public string? TypeName { get; set; }
             public Action<nint> FoundObjectCallback { get; set; } // Action<UObject*>
-            public FindObjectByName(ObjectSearch context, string objectName, string? typeName, Action<nint> foundCb)
+            public FindObjectByName(ObjectMethods context, string objectName, string? typeName, Action<nint> foundCb)
                 : base(context)
             {
                 ObjectName = objectName;
@@ -55,7 +69,7 @@ namespace Unreal.ClassConstructor
         {
             public string TypeName { get; set; }
             public Action<nint> FoundObjectCallback { get; set; }
-            public FindObjectFirstOfType(ObjectSearch context, string typeName, Action<nint> foundCb)
+            public FindObjectFirstOfType(ObjectMethods context, string typeName, Action<nint> foundCb)
                 : base(context)
             {
                 TypeName = typeName;
@@ -71,7 +85,7 @@ namespace Unreal.ClassConstructor
         {
             public string TypeName { get; set; }
             public Action<ICollection<nint>> FoundObjectCallback { get; set; }
-            public FindObjectAllOfType(ObjectSearch context, string typeName, Action<ICollection<nint>> foundCb)
+            public FindObjectAllOfType(ObjectMethods context, string typeName, Action<ICollection<nint>> foundCb)
                 : base(context)
             {
                 TypeName = typeName;
@@ -112,6 +126,23 @@ namespace Unreal.ClassConstructor
             });
             return ret;
         }
+        public unsafe TObjectType* FindObject<TObjectType>(string targetObj) where TObjectType : unmanaged
+        {
+            TObjectType* ret = null;
+            ForEachObject(currAddr =>
+            {
+                var currObj = (FUObjectItem*)currAddr;
+                if (_context.DoesNameMatch(currObj->Object, targetObj))
+                {
+                    if (_context.DoesClassMatch(currObj->Object, typeof(TObjectType).Name.Substring(1)))
+                    {
+                        ret = (TObjectType*)currObj->Object;
+                        return;
+                    }
+                }
+            });
+            return ret;
+        }
         public unsafe ICollection<nint> FindAllObjectsNamed(string targetObj, string? objType = null)
         {
             var objects = new List<nint>();
@@ -135,6 +166,21 @@ namespace Unreal.ClassConstructor
                 if (_context.DoesClassMatch(currObj->Object, objType))
                 {
                     ret = currObj->Object;
+                    return;
+                }
+            });
+            return ret;
+        }
+
+        public unsafe TObjectType* FindFirstOf<TObjectType>() where TObjectType : unmanaged
+        {
+            TObjectType* ret = null;
+            ForEachObject(currAddr =>
+            {
+                var currObj = (FUObjectItem*)currAddr;
+                if (_context.DoesClassMatch(currObj->Object, typeof(TObjectType).Name.Substring(1)))
+                {
+                    ret = (TObjectType*)currObj->Object;
                     return;
                 }
             });
@@ -185,8 +231,8 @@ namespace Unreal.ClassConstructor
             {
                 while (true)
                 {
-                    if (_findObjects.TryTake(out var currFindObj))
-                        currFindObj.Execute();
+                    var findObjectRequest = _findObjects.Take();
+                    findObjectRequest.Execute();
                 }
             }
             catch (OperationCanceledException) { } // Called during process termination

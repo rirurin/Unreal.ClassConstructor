@@ -2,7 +2,7 @@
   "ModId": "Unreal.ClassConstructor",
   "ModName": "Unreal Class Constructor",
   "ModAuthor": "Rirurin",
-  "ModVersion": "1.0.1",
+  "ModVersion": "1.1.0",
   "ModDescription": "Utilities for modifying and creating classes/objects",
   "ModDll": "Unreal.ClassConstructor.dll",
   "ModIcon": "Preview.png",
@@ -22,7 +22,7 @@
   ],
   "OptionalDependencies": [],
   "SupportedAppId": [
-    "p3r.exe"
+    "smt5v-win64-shipping.exe"
   ],
   "ProjectUrl": ""
 }

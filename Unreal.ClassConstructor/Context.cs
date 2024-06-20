@@ -1,17 +1,19 @@
-﻿using p3rpc.commonmodutils;
-using Reloaded.Memory.SigScan.ReloadedII.Interfaces;
+﻿using Reloaded.Memory.SigScan.ReloadedII.Interfaces;
 using Reloaded.Memory;
 using Reloaded.Mod.Interfaces;
 using SharedScans.Interfaces;
-using Reloaded.Hooks.Definitions;
 using Unreal.NativeTypes.Interfaces;
+using riri.commonmodutils;
+using Reloaded.Hooks.ReloadedII.Interfaces;
 
 namespace Unreal.ClassConstructor
 {
     public class ClassConstructorContext : Context
     {
         // Imports from Unreal Engine
+        private string GNamePool_SIG = "48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? C6 05 ?? ?? ?? ?? 01 0F 10 03";
         public unsafe FNamePool* g_namePool { get; private set; }
+        private string GObjectArray_SIG = "48 8B 05 ?? ?? ?? ?? 48 8B 0C ?? 48 8D 04 ?? 48 85 C0 74 ?? 44 39 40 ?? 75 ?? F7 40 ?? 00 00 00 30 75 ?? 48 8B 00";
         public unsafe FUObjectArray* g_objectArray { get; private set; }
         public IMemoryMethods _memoryMethods { get; private set; }
 
